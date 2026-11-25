@@ -6,7 +6,12 @@ _mangatool_completion() {
         words='convert crop append append-all split split-all rename completion help version --help --version'
     else
         case "${COMP_WORDS[1]}:$COMP_CWORD" in
-            convert:2) words='jpg jpeg webp png' ;;
+            convert:2)
+                case "$current" in
+                    */*) path_kind=directory ;;
+                    *) words='jpg jpeg webp png' ;;
+                esac
+                ;;
             completion:2) words='bash zsh' ;;
             convert:3|crop:2|append-all:2|split-all:2|rename:2) path_kind=directory ;;
             append:*) path_kind=page ;;

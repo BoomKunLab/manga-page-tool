@@ -42,10 +42,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          go mod download github.com/HugoSmits86/nativewebp golang.org/x/image
           go_root=$(go env GOROOT)
-          webp_module=$(go list -mod=readonly -m -f '{{.Dir}}' github.com/HugoSmits86/nativewebp)
-          image_module=$(go list -mod=readonly -m -f '{{.Dir}}' golang.org/x/image)
           for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             os=${platform%/*}
             arch=${platform#*/}
@@ -53,8 +50,6 @@ jobs:
             mkdir -p "$package/licenses"
             cp LICENSE README.md "$package/"
             cp "$go_root/LICENSE" "$package/licenses/Go.txt"
-            cp "$webp_module/LICENSE" "$package/licenses/nativewebp.txt"
-            cp "$image_module/LICENSE" "$package/licenses/golang.org-x-image.txt"
             binary=mangatool
             if [[ "$os" == windows ]]; then
               binary=mangatool.exe
@@ -62,6 +57,23 @@ jobs:
             GOOS="$os" GOARCH="$arch" go build -buildvcs=false -trimpath \
               -ldflags="-s -w -X main.releaseVersion=$GITHUB_REF_NAME" \
               -o "$package/$binary" ./cmd/mangatool
+            modules=$(GOOS="$os" GOARCH="$arch" go list -buildvcs=false -deps \
+              -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Dir}}{{end}}{{end}}' ./cmd/mangatool |
+              sed '/^$/d' | sort -u)
+            while read -r module module_dir; do
+              license_dir="$package/licenses/$module"
+              mkdir -p "$license_dir"
+              license="$module_dir/LICENSE"
+              if [[ ! -f "$license" ]]; then
+                license="$module_dir/LICENSE.txt"
+              fi
+              cp "$license" "$license_dir/"
+              for notice in NOTICE PATENTS; do
+                if [[ -f "$module_dir/$notice" ]]; then
+                  cp "$module_dir/$notice" "$license_dir/"
+                fi
+              done
+            done <<< "$modules"
             if [[ "$os" == windows ]]; then
               python3 -m zipfile -c "dist/$package.zip" "$package"
             else

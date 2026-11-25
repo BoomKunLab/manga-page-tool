@@ -198,52 +198,66 @@ func splitSpread(dir, name string, out io.Writer) error {
 	return err
 }
 
-func renamePages(dir, prefix string, start int64, out io.Writer) error {
+type pageRename struct {
+	from string
+	to   string
+}
+
+type renamePlan struct {
+	pageCount int
+	changes   []pageRename
+}
+
+func planRename(dir, prefix string, start int64) (renamePlan, error) {
 	names, err := pageFiles(dir, false)
-	if err != nil {
-		return err
-	}
-	if len(names) == 0 {
-		fmt.Fprintln(out, "画像ファイルが見つかりません。")
-		return nil
+	if err != nil || len(names) == 0 {
+		return renamePlan{}, err
 	}
 	const maxInt64 = 1<<63 - 1
 	if start > maxInt64-int64(len(names)-1) {
-		return errors.New("連番が整数の上限を超えます")
+		return renamePlan{}, errors.New("連番が整数の上限を超えます")
 	}
-	var sources, targets []string
+	plan := renamePlan{pageCount: len(names)}
+	var targets []string
 	reusable := make(map[string]bool)
 	for i, name := range names {
 		target := fmt.Sprintf("%s%03d%s", prefix, start+int64(i), filepath.Ext(name))
 		if name != target {
-			source := filepath.Join(dir, name)
-			sources = append(sources, source)
+			plan.changes = append(plan.changes, pageRename{from: name, to: target})
 			targets = append(targets, filepath.Join(dir, target))
-			reusable[source] = true
+			reusable[filepath.Join(dir, name)] = true
 		}
 	}
-	if len(sources) == 0 {
+	return plan, checkDestinations(targets, reusable)
+}
+
+func applyRename(dir string, plan renamePlan, out io.Writer) error {
+	if plan.pageCount == 0 {
+		fmt.Fprintln(out, "画像ファイルが見つかりません。")
+		return nil
+	}
+	if len(plan.changes) == 0 {
 		fmt.Fprintln(out, "変更するファイル名はありません。")
 		return nil
 	}
-	if err := checkDestinations(targets, reusable); err != nil {
-		return err
-	}
-
-	err = withBatch(dir, func(batch *fileBatch) error {
+	err := withBatch(dir, func(batch *fileBatch) error {
+		sources := make([]string, 0, len(plan.changes))
+		for _, change := range plan.changes {
+			sources = append(sources, filepath.Join(dir, change.from))
+		}
 		backups, err := batch.backups(sources...)
 		if err != nil {
 			return err
 		}
-		outputs := make([]pendingFile, 0, len(targets))
-		for i, target := range targets {
-			outputs = append(outputs, pendingFile{staged: backups[i].staged, target: target})
+		outputs := make([]pendingFile, 0, len(plan.changes))
+		for i, change := range plan.changes {
+			outputs = append(outputs, pendingFile{staged: backups[i].staged, target: filepath.Join(dir, change.to)})
 		}
 		return batch.commit(backups, outputs)
 	})
 	if err == nil {
-		for i, source := range sources {
-			fmt.Fprintf(out, "%s → %s\n", filepath.Base(source), filepath.Base(targets[i]))
+		for _, change := range plan.changes {
+			fmt.Fprintf(out, "%s → %s\n", change.from, change.to)
 		}
 	}
 	return err

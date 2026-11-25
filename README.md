@@ -37,6 +37,23 @@ Windows では `bin\mangatool.exe` を実行します。Go 1.27.4 以降がイ�
 - `append` と `split` は一括版を含め、処理できた元画像を削除します。 `rename` は元の名前を変更します。既存の出力は上書きせず、出力に失敗した操作の元画像は復元します。複数の見開きは1組ずつ処理し、失敗した組がある場合は終了コード1を返します。
 - ファイルの確定にはハードリンクを使うため、出力先のファイルシステムがハードリンクに対応している必要があります。更新中に強制終了した場合は、対象ディレクトリの `.mangatool-*` 内にある `originals` を確認し、必要なファイルを復元してから空の `.mangatool.lock` を取り除いてください。
 
+## 端末で選ぶ
+
+引数を省略すると、端末で入力フォルダや形式を選べます。
+
+| 起動方法 | 端末で指定する項目 |
+| --- | --- |
+| `mangatool crop` | 入力フォルダ |
+| `mangatool rename` | 入力フォルダ、接頭辞、開始番号 |
+| `mangatool rename pages` | 接頭辞、開始番号 |
+| `mangatool convert webp` | 入力フォルダ |
+| `mangatool convert ./pages` | 変換形式 |
+| `mangatool convert` | 変換形式、入力フォルダ |
+
+フォルダ選択はカレントディレクトリから始まります。名前の一部を入力すると候補が絞られます。上下キーで移動し、Tab でフォルダを開き、Enter で選択します。`.` は現在のフォルダ、`..` は親フォルダです。
+
+対話モードのリネームは、変更前後の名前を確認して Enter を押すと実行されます。Esc または Ctrl+C で取り消せます。スクリプトなどからは、すべての引数を指定して実行できます。
+
 ## タブ補完
 
 `mangatool` が PATH にある状態で、使っているシェルに応じて次の設定を読み込みます。
@@ -57,13 +74,13 @@ source <(mangatool completion zsh)
 
 ## バージョン
 
-`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.2.0` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux、macOS、Windows 向けのバイナリと SHA-256 チェックサムを GitHub Releases に作成します。
+`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.0` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux、macOS、Windows 向けのバイナリと SHA-256 チェックサムを GitHub Releases に作成します。
 
 GitHub に公開したタグは、Go または mise でバージョンを指定してインストールできます。
 
 ```sh
-go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.2.0
-mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.2.0
+go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.0
+mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.0
 ```
 
 ## ライセンス

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"slices"
-	"strconv"
 	"strings"
 )
 
@@ -16,16 +15,17 @@ var releaseVersion string // Set by the release build.
 
 const usage = `使い方: mangatool <コマンド> [引数...]
 
-  convert    <jpg|jpeg|webp|png> <ディレクトリ>  画像形式を一括変換
-  crop       <ディレクトリ>                  共通枠で切り取り、_cropped に保存
+  convert    [jpg|jpeg|webp|png] [ディレクトリ]  画像形式を一括変換
+  crop       [ディレクトリ]                  共通枠で切り取り、_cropped に保存
   append     <右ページ>...                   指定ページと次のページを見開きに結合
   append-all <ディレクトリ>                  自然順で2ページずつ結合
   split      <見開き>...                     見開きを左右に分割
   split-all  <ディレクトリ>                  見開き名（左-右）の画像を一括で分割
-  rename     <ディレクトリ> <接頭辞> [開始番号]  自然順で連番リネーム
+  rename     [ディレクトリ [接頭辞 [開始番号]]]  自然順で連番リネーム
   completion <bash|zsh>                      タブ補完スクリプトを表示
 
 append、split とその一括版は、処理できた元画像を削除します。
+crop、rename、convert は引数を省略すると端末で選択できます。
 mangatool --version でバージョンを表示します。
 
 使用例
@@ -38,6 +38,9 @@ mangatool --version でバージョンを表示します。
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
+		if errors.Is(err, errPromptCancelled) {
+			return
+		}
 		fmt.Fprintln(os.Stderr, "エラー:", err)
 		os.Exit(1)
 	}
@@ -57,28 +60,23 @@ func run(args []string, out io.Writer) error {
 	case "completion":
 		return writeCompletion(args, out)
 	case "convert":
-		if len(args) != 2 {
-			return errors.New("使い方: mangatool convert <jpg|jpeg|webp|png> <ディレクトリ>")
-		}
-		format := strings.ToLower(strings.TrimPrefix(args[0], "."))
-		switch format {
-		case "jpg", "jpeg":
-			format = "jpeg"
-		case "webp", "png":
+		return runConvert(args, out)
+	case "crop":
+		switch len(args) {
+		case 0:
+			dir, err := selectDirectory()
+			if err != nil {
+				return err
+			}
+			return transformDirectory(dir, command, out)
+		case 1:
+			return transformDirectory(filepath.Clean(args[0]), command, out)
 		default:
-			return fmt.Errorf("変換形式 %q は未対応です。jpg、jpeg、webp、png を指定してください", args[0])
+			return errors.New("使い方: mangatool crop [ディレクトリ]")
 		}
-		dir, err := resolveDir(args[1])
-		if err != nil {
-			return err
-		}
-		return transformDirectory(dir, format, out)
-	case "crop", "append-all", "split-all":
+	case "append-all", "split-all":
 		if len(args) != 1 {
 			return fmt.Errorf("使い方: mangatool %s <ディレクトリ>", command)
-		}
-		if command == "crop" {
-			return transformDirectory(filepath.Clean(args[0]), command, out)
 		}
 		return editDirectory(args[0], func(dir string) error {
 			return editSpreads(dir, command, nil, out)
@@ -89,23 +87,7 @@ func run(args []string, out io.Writer) error {
 		}
 		return editSelected(args, command, out)
 	case "rename":
-		if len(args) < 2 || len(args) > 3 {
-			return errors.New("使い方: mangatool rename <ディレクトリ> <接頭辞> [開始番号]")
-		}
-		if strings.ContainsAny(args[1], `/\:`) {
-			return errors.New("接頭辞にパス区切り文字やコロンは使えません")
-		}
-		var start int64
-		if len(args) == 3 && args[2] != "" {
-			var err error
-			start, err = strconv.ParseInt(args[2], 10, 64)
-			if err != nil {
-				return fmt.Errorf("開始番号は整数を指定してください: %q", args[2])
-			}
-		}
-		return editDirectory(args[0], func(dir string) error {
-			return renamePages(dir, args[1], start, out)
-		})
+		return runRename(args, out)
 	default:
 		return fmt.Errorf("不明なコマンド %q。mangatool --help で使い方を表示します", command)
 	}
