@@ -76,14 +76,22 @@ source <(mangatool completion zsh)
 
 ## バージョン
 
-`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.5` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
-
-GitHub に公開したタグは、Go または mise でバージョンを指定してインストールできます。
+`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。最新版は Go または mise でインストールできます。
 
 ```sh
-go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.5
-mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.5
+go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@latest
+mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@latest
 ```
+
+`@latest` を公開済みのタグに置き換えると、バージョンを固定できます。
+
+### リリース手順
+
+GitHub の **Actions → Release → Run workflow** で `main` を選び、`version` に `v0.3.6` のような番号を入力します。起動時点のコミットをテストし、Linux と macOS 向けのバイナリ（各 amd64・arm64）をビルドしてから、そのコミットにタグを付けます。アーカイブと SHA-256 チェックサムは GitHub Releases に公開されます。
+
+リリース番号は、既存機能の修正や表示改善でパッチ、新機能の追加でマイナーを上げます。公開済みのタグは固定します。タグの作成後に公開処理が失敗した場合は、同じ Actions の実行を再実行すると、そのタグと下書きを使って再試行できます。
+
+PR と `main` への push では、[Tests](.github/workflows/test.yml) が Go のテストに加え、生成した画像で CLI の切り取りと形式変換を確認します。リリース処理は [Publish a release](.github/workflows/publish-release.yml) にあり、別のワークフローからも `version` と `contents: write` 権限を指定して呼び出せます。
 
 ## ライセンス
 

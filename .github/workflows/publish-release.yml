@@ -1,0 +1,133 @@
+name: Publish a release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: '0'
+  GOTOOLCHAIN: local
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release request
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Releases must use the main branch."
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Enter a release version like v0.3.6."
+            exit 1
+          fi
+  test:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    concurrency:
+      group: mangatool-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build release archives
+        shell: bash
+        run: |
+          mkdir -p dist
+          go_root=$(go env GOROOT)
+          for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${platform%/*}
+            arch=${platform#*/}
+            package=mangatool-${RELEASE_VERSION}-${os}-${arch}
+            mkdir -p "$package/licenses"
+            cp LICENSE README.md "$package/"
+            cp "$go_root/LICENSE" "$package/licenses/Go.txt"
+            GOOS="$os" GOARCH="$arch" go build -buildvcs=false -trimpath \
+              -ldflags="-s -w -X main.releaseVersion=$RELEASE_VERSION" \
+              -o "$package/mangatool" ./cmd/mangatool
+            modules=$(GOOS="$os" GOARCH="$arch" go list -buildvcs=false -deps \
+              -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Dir}}{{end}}{{end}}' ./cmd/mangatool |
+              sed '/^$/d' | sort -u)
+            while read -r module module_dir; do
+              license_dir="$package/licenses/$module"
+              mkdir -p "$license_dir"
+              license="$module_dir/LICENSE"
+              if [[ ! -f "$license" ]]; then
+                license="$module_dir/LICENSE.txt"
+              fi
+              cp "$license" "$license_dir/"
+              for notice in NOTICE PATENTS; do
+                if [[ -f "$module_dir/$notice" ]]; then
+                  cp "$module_dir/$notice" "$license_dir/"
+                fi
+              done
+            done <<< "$modules"
+            tar -czf "dist/$package.tar.gz" "$package"
+          done
+          cd dist
+          sha256sum ./*.tar.gz > checksums.txt
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_state=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | [.tag_name, .draft] | @tsv' |
+            awk -F '\t' -v tag="$RELEASE_VERSION" '$1 == tag { print $2 == "true" ? "draft" : "published" }')
+          case "$release_state" in
+            ""|draft) ;;
+            *)
+              echo "::error::A published or conflicting release already exists for $RELEASE_VERSION."
+              exit 1
+              ;;
+          esac
+
+          tag_ref="refs/tags/$RELEASE_VERSION"
+          remote_tag=$(git ls-remote --refs origin "$tag_ref")
+          if [[ -z "$remote_tag" ]]; then
+            if [[ "$release_state" == draft ]]; then
+              echo "::error::Draft release $RELEASE_VERSION has no matching remote tag."
+              exit 1
+            fi
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              tag -a "$RELEASE_VERSION" "$GITHUB_SHA" -m "Release $RELEASE_VERSION"
+            git push origin "$tag_ref"
+          else
+            git fetch --no-tags origin "$tag_ref"
+            if [[ "$(git rev-parse 'FETCH_HEAD^{commit}')" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag $RELEASE_VERSION points to a different commit."
+              exit 1
+            fi
+          fi
+
+          if [[ -z "$release_state" ]]; then
+            gh release create "$RELEASE_VERSION" --verify-tag --draft --generate-notes
+          fi
+          gh release upload "$RELEASE_VERSION" --clobber dist/*
+          gh release edit "$RELEASE_VERSION" --draft=false
