@@ -100,7 +100,7 @@ func subImage(img image.Image, area image.Rectangle) image.Image {
 
 func transformDirectory(dir, format string, out io.Writer) error {
 	crop := format == "crop"
-	fmt.Fprintf(out, "入力フォルダの画像を確認しています: %s\n", displayText(dir))
+	reportProgress(out, "入力フォルダの画像を確認しています: %s", displayText(dir))
 	names, err := pageFiles(dir, !crop)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 
 	var cropArea image.Rectangle
 	if crop {
-		progress := startPageProgress(out, "共通切り取り枠を計算するため、各ページの余白を調べています", len(names))
+		progress := startPageProgress(out, "共通枠のため、各ページの余白を調べています", len(names))
 		for i, name := range names {
 			progress.processing(i, name)
 			img, err := readImage(filepath.Join(dir, name))
@@ -129,7 +129,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 		if cropArea.Empty() {
 			return errors.New("内容領域のあるページがないため、共通切り取り枠を計算できません")
 		}
-		fmt.Fprintf(out, "共通切り取り枠: %dx%d+%d+%d\n", cropArea.Dx(), cropArea.Dy(), cropArea.Min.X, cropArea.Min.Y)
+		reportProgress(out, "共通切り取り枠: %dx%d+%d+%d", cropArea.Dx(), cropArea.Dy(), cropArea.Min.X, cropArea.Min.Y)
 	}
 
 	suffix, extension := "_"+format, "."+format
@@ -148,7 +148,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 		return fmt.Errorf("ルートディレクトリ %q の隣に出力できません", absolute)
 	}
 	dest := absolute + suffix
-	fmt.Fprintf(out, "出力先を確認しています: %s\n", displayText(dest))
+	reportProgress(out, "出力先を確認しています: %s", displayText(dest))
 	paths := make([]string, 0, len(names))
 	for _, name := range names {
 		targetName := name
@@ -195,7 +195,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 			}
 			outputs = append(outputs, file)
 		}
-		fmt.Fprintln(out, "出力ファイルを確定しています")
+		reportProgress(out, "出力ファイルを確定しています")
 		return batch.commit(nil, outputs)
 	})
 	if err == nil {

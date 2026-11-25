@@ -37,7 +37,7 @@ Go 1.27.4 以降がインストール済みなら `go build -trimpath -o bin/ ./
 - `append` と `split` は一括版を含め、処理できた元画像を削除します。 `rename` は元の名前を変更します。既存の出力は上書きせず、出力に失敗した操作の元画像は復元します。複数の見開きは1組ずつ処理し、失敗した組がある場合は終了コード1を返します。
 - ファイルの確定にはハードリンクを使うため、出力先のファイルシステムがハードリンクに対応している必要があります。更新中に強制終了した場合は、対象ディレクトリの `.mangatool-*` 内にある `originals` を確認し、必要なファイルを復元してから空の `.mangatool.lock` を取り除いてください。
 
-`crop` と `convert` は、工程ごとの対象枚数と処理中のファイルを節目ごとに表示します。
+端末では進捗をスピナー付きの1行に表示し、処理が終わると結果を表示します。`crop` と `convert` では工程、枚数、処理中のファイルを確認できます。出力をファイルに保存したりパイプに渡したりする場合は、節目ごとの進捗が通常のテキストで出力されます。
 
 ## 端末で選ぶ
 
@@ -76,13 +76,13 @@ source <(mangatool completion zsh)
 
 ## バージョン
 
-`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.3` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
+`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.4` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
 
 GitHub に公開したタグは、Go または mise でバージョンを指定してインストールできます。
 
 ```sh
-go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.3
-mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.3
+go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.4
+mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.4
 ```
 
 ## ライセンス

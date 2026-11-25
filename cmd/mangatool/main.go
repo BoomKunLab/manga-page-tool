@@ -37,7 +37,10 @@ mangatool --version でバージョンを表示します。
 `
 
 func main() {
-	if err := run(os.Args[1:], os.Stdout); err != nil {
+	out, finish := withTerminalProgress(os.Stdout)
+	err := run(os.Args[1:], out)
+	finish()
+	if err != nil {
 		if errors.Is(err, errPromptCancelled) {
 			return
 		}
@@ -79,7 +82,11 @@ func run(args []string, out io.Writer) error {
 			return fmt.Errorf("使い方: mangatool %s <ディレクトリ>", command)
 		}
 		return editDirectory(args[0], func(dir string) error {
-			return editSpreads(dir, command, nil, out)
+			result, err := editSpreads(dir, command, nil, out)
+			if err == nil || result.completed > 0 || result.lastPage != "" {
+				result.print(command, out)
+			}
+			return err
 		})
 	case "append", "split":
 		if len(args) == 0 {

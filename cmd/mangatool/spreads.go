@@ -16,6 +16,7 @@ func editSelected(paths []string, command string, out io.Writer) error {
 	byDirectory := make(map[string][]string)
 	var dirs []string
 	var result error
+	var summary spreadResult
 	for _, path := range paths {
 		dir, err := resolveDir(filepath.Dir(path))
 		if err != nil {
@@ -29,35 +30,61 @@ func editSelected(paths []string, command string, out io.Writer) error {
 	}
 	for _, dir := range dirs {
 		err := editDirectory(dir, func(resolved string) error {
-			return editSpreads(resolved, command, byDirectory[dir], out)
+			res, err := editSpreads(resolved, command, byDirectory[dir], out)
+			summary.completed += res.completed
+			return err
 		})
 		result = errors.Join(result, err)
+	}
+	if result == nil || summary.completed > 0 {
+		summary.print(command, out)
 	}
 	return result
 }
 
-func editSpreads(dir, command string, selected []string, out io.Writer) error {
+type spreadResult struct {
+	completed int
+	lastPage  string
+}
+
+func (r spreadResult) print(command string, out io.Writer) {
+	switch {
+	case command == "split" || command == "split-all":
+		fmt.Fprintf(out, "%d 枚の見開きを分割しました\n", r.completed)
+	case r.lastPage != "":
+		fmt.Fprintf(out, "%d 組を結合しました。最後の1枚を残しました: %s\n", r.completed, displayText(r.lastPage))
+	default:
+		fmt.Fprintf(out, "%d 組を結合しました\n", r.completed)
+	}
+}
+
+func editSpreads(dir, command string, selected []string, out io.Writer) (spreadResult, error) {
+	var summary spreadResult
 	var pages []string
 	if command != "split" {
-		fmt.Fprintf(out, "対象の画像を確認しています: %s\n", displayText(dir))
+		reportProgress(out, "対象の画像を確認しています: %s", displayText(dir))
 		var err error
 		pages, err = pageFiles(dir, false)
 		if err != nil {
-			return err
+			return summary, err
 		}
 	}
 	var result error
 	switch command {
 	case "append-all":
-		fmt.Fprintf(out, "見開きの結合を開始します（対象: %d 組）\n", len(pages)/2)
+		reportProgress(out, "見開きの結合を開始します（対象: %d 組）", len(pages)/2)
 		for i := 0; i+1 < len(pages); i += 2 {
-			result = errors.Join(result, appendSpread(dir, pages[i], pages[i+1], out))
+			if err := appendSpread(dir, pages[i], pages[i+1], out); err != nil {
+				result = errors.Join(result, err)
+				continue
+			}
+			summary.completed++
 		}
 		if len(pages)%2 == 1 {
-			fmt.Fprintf(out, "最後の1枚を残しました: %s\n", pages[len(pages)-1])
+			summary.lastPage = pages[len(pages)-1]
 		}
 	case "append":
-		fmt.Fprintf(out, "見開きの結合を開始します（指定: %d 件）\n", len(selected))
+		reportProgress(out, "見開きの結合を開始します（指定: %d 件）", len(selected))
 		used := make(map[string]bool)
 		for _, name := range selected {
 			index := slices.Index(pages, name)
@@ -75,6 +102,7 @@ func editSpreads(dir, command string, selected []string, out io.Writer) error {
 				continue
 			}
 			used[name], used[next] = true, true
+			summary.completed++
 		}
 	case "split-all", "split":
 		if command == "split-all" {
@@ -82,12 +110,16 @@ func editSpreads(dir, command string, selected []string, out io.Writer) error {
 				return !strings.Contains(stem(name), "-")
 			})
 		}
-		fmt.Fprintf(out, "見開きの分割を開始します（対象: %d 枚）\n", len(selected))
+		reportProgress(out, "見開きの分割を開始します（対象: %d 枚）", len(selected))
 		for _, name := range selected {
-			result = errors.Join(result, splitSpread(dir, name, out))
+			if err := splitSpread(dir, name, out); err != nil {
+				result = errors.Join(result, err)
+				continue
+			}
+			summary.completed++
 		}
 	}
-	return result
+	return summary, result
 }
 
 func appendSpread(dir, rightName, leftName string, out io.Writer) error {
@@ -97,7 +129,7 @@ func appendSpread(dir, rightName, leftName string, out io.Writer) error {
 		return err
 	}
 	rightPath, leftPath := filepath.Join(dir, rightName), filepath.Join(dir, leftName)
-	fmt.Fprintf(out, "結合中: %s + %s\n", displayText(rightName), displayText(leftName))
+	reportProgress(out, "結合中: %s + %s", displayText(rightName), displayText(leftName))
 	right, err := readImage(rightPath)
 	if err != nil {
 		return err
@@ -132,7 +164,7 @@ func appendSpread(dir, rightName, leftName string, out io.Writer) error {
 		return batch.commit(backups, []pendingFile{file})
 	})
 	if err == nil {
-		fmt.Fprintf(out, "結合: %s (右) + %s (左) → %s\n", rightName, leftName, name)
+		reportProgress(out, "結合: %s (右) + %s (左) → %s", displayText(rightName), displayText(leftName), displayText(name))
 	}
 	return err
 }
@@ -169,7 +201,7 @@ func splitSpread(dir, name string, out io.Writer) error {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("通常のファイルではありません: %s", source)
 	}
-	fmt.Fprintf(out, "分割中: %s\n", displayText(name))
+	reportProgress(out, "分割中: %s", displayText(name))
 	img, err := readImage(source)
 	if err != nil {
 		return err
@@ -198,7 +230,7 @@ func splitSpread(dir, name string, out io.Writer) error {
 		return batch.commit(backups, outputs)
 	})
 	if err == nil {
-		fmt.Fprintf(out, "分割: %s → %s / %s\n", name, left+ext, right+ext)
+		reportProgress(out, "分割: %s → %s / %s", displayText(name), displayText(left+ext), displayText(right+ext))
 	}
 	return err
 }
@@ -245,7 +277,7 @@ func applyRename(dir string, plan renamePlan, out io.Writer) error {
 		fmt.Fprintln(out, "変更するファイル名はありません。")
 		return nil
 	}
-	fmt.Fprintf(out, "%d 枚のファイル名を変更しています\n", len(plan.changes))
+	reportProgress(out, "%d 枚のファイル名を変更しています", len(plan.changes))
 	err := withBatch(dir, func(batch *fileBatch) error {
 		sources := make([]string, 0, len(plan.changes))
 		for _, change := range plan.changes {
@@ -263,8 +295,9 @@ func applyRename(dir string, plan renamePlan, out io.Writer) error {
 	})
 	if err == nil {
 		for _, change := range plan.changes {
-			fmt.Fprintf(out, "%s → %s\n", change.from, change.to)
+			reportProgress(out, "%s → %s", displayText(change.from), displayText(change.to))
 		}
+		fmt.Fprintf(out, "%d 枚のファイル名を変更しました\n", len(plan.changes))
 	}
 	return err
 }

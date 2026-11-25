@@ -107,7 +107,7 @@ func runRename(args []string, out io.Writer) error {
 			}
 		}
 		return editDirectory(args[0], func(dir string) error {
-			fmt.Fprintf(out, "連番リネームの対象を確認しています: %s\n", displayText(dir))
+			reportProgress(out, "連番リネームの対象を確認しています: %s", displayText(dir))
 			plan, err := planRename(dir, args[1], start)
 			if err != nil {
 				return err
@@ -152,7 +152,7 @@ func runRename(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "連番リネームのプレビューを準備しています: %s\n", displayText(directory))
+	reportProgress(out, "連番リネームのプレビューを準備しています: %s", displayText(directory))
 	plan, err := planRename(directory, prefix, start)
 	if err != nil {
 		return err
@@ -163,6 +163,9 @@ func runRename(args []string, out io.Writer) error {
 	prompt := newPrompt(promptConfirm, fmt.Sprintf("リネーム内容を確認（%d 枚）", len(plan.changes)))
 	for _, change := range plan.changes {
 		prompt.options = append(prompt.options, promptOption{label: change.from + " → " + change.to})
+	}
+	if progress, ok := out.(*terminalProgress); ok {
+		progress.clear()
 	}
 	if _, err := prompt.run(); err != nil {
 		return err
