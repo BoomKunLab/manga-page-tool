@@ -107,6 +107,7 @@ func runRename(args []string, out io.Writer) error {
 			}
 		}
 		return editDirectory(args[0], func(dir string) error {
+			fmt.Fprintf(out, "連番リネームの対象を確認しています: %s\n", displayText(dir))
 			plan, err := planRename(dir, args[1], start)
 			if err != nil {
 				return err
@@ -151,6 +152,7 @@ func runRename(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(out, "連番リネームのプレビューを準備しています: %s\n", displayText(directory))
 	plan, err := planRename(directory, prefix, start)
 	if err != nil {
 		return err

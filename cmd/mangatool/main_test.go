@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -95,7 +96,27 @@ func TestCropUsesOneFrameAndKeepsBlankPage(t *testing.T) {
 		draw.Draw(page, image.Rect(0, data.height-1, 20, data.height), image.Black, image.Point{}, draw.Src)
 		savePNG(t, filepath.Join(input, data.name), page)
 	}
-	mustRun(t, "crop", input+string(os.PathSeparator))
+	var out bytes.Buffer
+	if err := run([]string{"crop", input + string(os.PathSeparator)}, &out); err != nil {
+		t.Fatalf("crop: %v\n%s", err, &out)
+	}
+	log := out.String()
+	for _, message := range []string{
+		"各ページの余白を調べています（対象: 3 枚）",
+		"[1/3] 処理中: 1.png",
+		"[3/3] 処理中: 3.png",
+		"共通切り取り枠: 11x13+3+4",
+		"共通枠で切り取っています（対象: 3 枚）",
+		"[3/3] 処理中: 3.png",
+		"出力ファイルを確定しています",
+		"3 枚を保存しました",
+	} {
+		_, rest, found := strings.Cut(log, message)
+		if !found {
+			t.Fatalf("progress message %q missing or out of order in:\n%s", message, &out)
+		}
+		log = rest
+	}
 	for _, name := range []string{"1.png", "2.png", "3.png"} {
 		assertExists(t, filepath.Join(input, name))
 		page := loadPage(t, filepath.Join(input+"_cropped", name))

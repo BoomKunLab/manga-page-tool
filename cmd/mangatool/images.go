@@ -100,6 +100,7 @@ func subImage(img image.Image, area image.Rectangle) image.Image {
 
 func transformDirectory(dir, format string, out io.Writer) error {
 	crop := format == "crop"
+	fmt.Fprintf(out, "入力フォルダの画像を確認しています: %s\n", displayText(dir))
 	names, err := pageFiles(dir, !crop)
 	if err != nil {
 		return err
@@ -111,7 +112,9 @@ func transformDirectory(dir, format string, out io.Writer) error {
 
 	var cropArea image.Rectangle
 	if crop {
-		for _, name := range names {
+		progress := startPageProgress(out, "共通切り取り枠を計算するため、各ページの余白を調べています", len(names))
+		for i, name := range names {
+			progress.processing(i, name)
 			img, err := readImage(filepath.Join(dir, name))
 			if err != nil {
 				return err
@@ -145,6 +148,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 		return fmt.Errorf("ルートディレクトリ %q の隣に出力できません", absolute)
 	}
 	dest := absolute + suffix
+	fmt.Fprintf(out, "出力先を確認しています: %s\n", displayText(dest))
 	paths := make([]string, 0, len(names))
 	for _, name := range names {
 		targetName := name
@@ -165,9 +169,15 @@ func transformDirectory(dir, format string, out io.Writer) error {
 		return fmt.Errorf("出力先が通常のディレクトリではありません: %s", dest)
 	}
 
+	stage := fmt.Sprintf("%s に変換しています", strings.ToUpper(format))
+	if crop {
+		stage = "共通枠で切り取っています"
+	}
 	err = withBatch(dest, func(batch *fileBatch) error {
+		progress := startPageProgress(out, stage, len(names))
 		outputs := make([]pendingFile, 0, len(names))
 		for i, name := range names {
+			progress.processing(i, name)
 			img, err := readImage(filepath.Join(dir, name))
 			if err != nil {
 				return err
@@ -185,6 +195,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 			}
 			outputs = append(outputs, file)
 		}
+		fmt.Fprintln(out, "出力ファイルを確定しています")
 		return batch.commit(nil, outputs)
 	})
 	if err == nil {
