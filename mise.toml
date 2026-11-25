@@ -1,0 +1,16 @@
+[tools]
+go = "1.27.4"
+
+[env]
+CGO_ENABLED = "0"
+GOTOOLCHAIN = "local"
+
+[tasks.build]
+description = "Build mangatool into bin/"
+run = "go build -trimpath -o bin/ ./cmd/mangatool"
+raw = true
+
+[tasks.test]
+description = "Run the Go tests"
+run = "go test ./..."
+raw = true
