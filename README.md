@@ -2,7 +2,7 @@
 
 漫画のスキャン画像を整えるコマンドラインツールです。画像の形式変換、余白の切り取り、見開きの結合と分割、連番リネームができます。
 
-Go で実装しており、ビルド済みの `mangatool` は単体で実行できます。
+Linux（WSL を含む）と macOS に対応しています。ビルド済みの `mangatool` は単体で実行できます。WSL では Linux 版を使います。
 
 ## ソースからビルド
 
@@ -14,7 +14,7 @@ mise run build
 ./bin/mangatool --help
 ```
 
-Windows では `bin\mangatool.exe` を実行します。Go 1.27.4 以降がインストール済みなら `go build -trimpath -o bin/ ./cmd/mangatool` でもビルドできます。
+Go 1.27.4 以降がインストール済みなら `go build -trimpath -o bin/ ./cmd/mangatool` でもビルドできます。
 
 ## 使い方
 
@@ -74,13 +74,13 @@ source <(mangatool completion zsh)
 
 ## バージョン
 
-`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.0` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux、macOS、Windows 向けのバイナリと SHA-256 チェックサムを GitHub Releases に作成します。
+`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.1` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
 
 GitHub に公開したタグは、Go または mise でバージョンを指定してインストールできます。
 
 ```sh
-go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.0
-mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.0
+go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.1
+mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.1
 ```
 
 ## ライセンス
