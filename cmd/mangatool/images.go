@@ -116,7 +116,12 @@ func transformDirectory(dir, format string, out io.Writer) error {
 			if err != nil {
 				return err
 			}
-			cropArea = cropArea.Union(contentArea(img))
+			// Ignore the screenshot UI line when detecting the frame only.
+			box := img.Bounds()
+			box.Max.Y--
+			if !box.Empty() {
+				cropArea = cropArea.Union(contentArea(img, box))
+			}
 		}
 		if cropArea.Empty() {
 			return errors.New("内容領域のあるページがないため、共通切り取り枠を計算できません")
@@ -189,8 +194,7 @@ func transformDirectory(dir, format string, out io.Writer) error {
 }
 
 // Use a nearby corner as the reference for each edge and a 20% color tolerance.
-func contentArea(img image.Image) image.Rectangle {
-	box := img.Bounds()
+func contentArea(img image.Image, box image.Rectangle) image.Rectangle {
 	left, top, right, bottom := box.Min.X, box.Min.Y, box.Max.X, box.Max.Y
 	nw := sampleColor(img.At(left, top))
 	ne := sampleColor(img.At(right-1, top))
@@ -226,7 +230,7 @@ func contentArea(img image.Image) image.Rectangle {
 	if left == right || top == bottom {
 		return image.Rectangle{}
 	}
-	return image.Rect(left, top, right, bottom).Sub(box.Min)
+	return image.Rect(left, top, right, bottom).Sub(img.Bounds().Min)
 }
 
 type pixelColor struct{ r, g, b, a float64 }

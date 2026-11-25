@@ -81,15 +81,18 @@ func TestConvertRejectsDuplicateNamesAndInvalidInput(t *testing.T) {
 func TestCropUsesOneFrameAndKeepsBlankPage(t *testing.T) {
 	input := newPageDirectory(t)
 	for _, data := range []struct {
-		name string
-		ink  image.Rectangle
+		name   string
+		height int
+		ink    image.Rectangle
 	}{
-		{"1.png", image.Rect(3, 6, 12, 13)},
-		{"2.png", image.Rect(5, 4, 14, 17)},
-		{"3.png", image.Rectangle{}},
+		{"1.png", 20, image.Rect(3, 6, 12, 13)},
+		{"2.png", 20, image.Rect(5, 4, 14, 17)},
+		{"3.png", 17, image.Rectangle{}},
 	} {
-		page := solidPage(20, 20, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		page := solidPage(20, data.height, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 		draw.Draw(page, data.ink, image.Black, image.Point{}, draw.Src)
+		// The black UI line must not widen the common frame.
+		draw.Draw(page, image.Rect(0, data.height-1, 20, data.height), image.Black, image.Point{}, draw.Src)
 		savePNG(t, filepath.Join(input, data.name), page)
 	}
 	mustRun(t, "crop", input+string(os.PathSeparator))
@@ -98,6 +101,12 @@ func TestCropUsesOneFrameAndKeepsBlankPage(t *testing.T) {
 		page := loadPage(t, filepath.Join(input+"_cropped", name))
 		if got, want := page.Bounds(), image.Rect(0, 0, 11, 13); got != want {
 			t.Fatalf("%s crop = %v, want %v", name, got, want)
+		}
+		if name == "3.png" {
+			// Its last row falls inside the frame and still comes from the original.
+			if got := color.GrayModel.Convert(page.At(0, 12)); got != (color.Gray{Y: 0}) {
+				t.Fatalf("last row = %v, want original black pixel", got)
+			}
 		}
 	}
 }

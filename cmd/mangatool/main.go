@@ -23,9 +23,17 @@ const usage = `使い方: mangatool <コマンド> [引数...]
   split      <見開き>...                     見開きを左右に分割
   split-all  <ディレクトリ>                  見開き名（左-右）の画像を一括で分割
   rename     <ディレクトリ> <接頭辞> [開始番号]  自然順で連番リネーム
+  completion <bash|zsh>                      タブ補完スクリプトを表示
 
 append、split とその一括版は、処理できた元画像を削除します。
 mangatool --version でバージョンを表示します。
+
+使用例
+  mangatool convert webp pages
+  mangatool crop pages
+  mangatool append pages_cropped/20.png
+  mangatool split pages_cropped/21-20.png
+  mangatool rename pages_cropped page_ 1
 `
 
 func main() {
@@ -46,6 +54,8 @@ func run(args []string, out io.Writer) error {
 		fmt.Fprint(out, usage)
 	case "version", "-v", "--version":
 		fmt.Fprintln(out, "mangatool", version())
+	case "completion":
+		return writeCompletion(args, out)
 	case "convert":
 		if len(args) != 2 {
 			return errors.New("使い方: mangatool convert <jpg|jpeg|webp|png> <ディレクトリ>")
