@@ -27,8 +27,9 @@ const (
 )
 
 type promptOption struct {
-	label string
-	value string
+	label          string
+	value          string
+	navigationOnly bool
 }
 
 type terminalPrompt struct {
@@ -125,7 +126,12 @@ func (m *terminalPrompt) enter() tea.Cmd {
 		if len(m.matches) == 0 {
 			return nil
 		}
-		m.result = m.options[m.matches[m.selected]].value
+		option := m.options[m.matches[m.selected]]
+		if option.navigationOnly {
+			m.status = "確定するにはフォルダ名の行を選んで Enter を押してください"
+			return nil
+		}
+		m.result = option.value
 	case promptInput:
 		value := m.input.Value()
 		if err := m.validate(value); err != nil {
@@ -196,7 +202,7 @@ func (m *terminalPrompt) View() tea.View {
 	}
 	switch m.kind {
 	case promptDirectory:
-		lines = append(lines, "↑↓ 移動  Tab フォルダを開く  Enter 選択  Esc 取消")
+		lines = append(lines, "↑↓ 移動  Tab フォルダを開く  Enter フォルダ名を確定  Esc 取消")
 	case promptChoice:
 		lines = append(lines, "↑↓ 移動  Enter 選択  Esc 取消")
 	case promptInput:
@@ -231,9 +237,9 @@ func (m *terminalPrompt) openDirectory(path string) {
 	m.directory = path
 	m.status = ""
 	m.input.SetValue("")
-	m.options = []promptOption{{label: ".  現在のフォルダ", value: path}}
+	m.options = []promptOption{{label: ".  現在のフォルダ", value: path, navigationOnly: true}}
 	if parent := filepath.Dir(path); parent != path {
-		m.options = append(m.options, promptOption{label: "..  親フォルダ", value: parent})
+		m.options = append(m.options, promptOption{label: "..  親フォルダ（Tab で移動）", value: parent, navigationOnly: true})
 	}
 	for _, entry := range entries {
 		full := filepath.Join(path, entry.Name())

@@ -50,7 +50,7 @@ Go 1.27.4 以降がインストール済みなら `go build -trimpath -o bin/ ./
 | `mangatool convert ./pages` | 変換形式 |
 | `mangatool convert` | 変換形式、入力フォルダ |
 
-フォルダ選択はカレントディレクトリから始まります。名前の一部を入力すると候補が絞られます。上下キーで移動し、Tab でフォルダを開き、Enter で選択します。`.` は現在のフォルダ、`..` は親フォルダです。
+フォルダ選択はカレントディレクトリから始まります。名前の一部を入力すると候補が絞られます。上下キーで移動し、Tab でフォルダを開き、フォルダ名の行で Enter を押すと確定します。`.` と `..` の行は Enter の確定対象から外しています。`..` の行で Tab を押すと親フォルダへ移動します。カレントディレクトリを切り取る場合は `mangatool crop .` と指定できます。
 
 対話モードのリネームは、変更前後の名前を確認して Enter を押すと実行されます。Esc または Ctrl+C で取り消せます。スクリプトなどからは、すべての引数を指定して実行できます。
 
@@ -74,13 +74,13 @@ source <(mangatool completion zsh)
 
 ## バージョン
 
-`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.1` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
+`mangatool --version` はリリース番号か開発ビルドのコミットIDを表示します。GitHub に `v0.3.2` のようなタグをプッシュすると、GitHub Actions がテスト後に Linux と macOS 向けのバイナリ（各 amd64・arm64）と SHA-256 チェックサムを GitHub Releases に作成します。
 
 GitHub に公開したタグは、Go または mise でバージョンを指定してインストールできます。
 
 ```sh
-go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.1
-mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.1
+go install github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.2
+mise use -g go:github.com/BoomKunLab/manga-page-tool/cmd/mangatool@v0.3.2
 ```
 
 ## ライセンス

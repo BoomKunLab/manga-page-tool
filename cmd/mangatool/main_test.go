@@ -223,6 +223,26 @@ func TestBatchRestoresOriginalAfterPublishFailure(t *testing.T) {
 	}
 }
 
+func TestDirectorySelectorRejectsEnterOnNavigationRows(t *testing.T) {
+	dir := newPageDirectory(t)
+	child := filepath.Join(dir, "chapter")
+	if err := os.Mkdir(child, 0700); err != nil {
+		t.Fatal(err)
+	}
+	prompt := newPrompt(promptDirectory, "入力フォルダを選択")
+	prompt.openDirectory(dir)
+	for index, name := range []string{".", ".."} {
+		prompt.selected = index
+		if cmd := prompt.enter(); cmd != nil || prompt.accepted || prompt.result != "" {
+			t.Fatalf("Enter accepted navigation row %q", name)
+		}
+	}
+	prompt.selected = 2
+	if cmd := prompt.enter(); cmd == nil || !prompt.accepted || prompt.result != child {
+		t.Fatalf("Enter selected %q, want %q", prompt.result, child)
+	}
+}
+
 func mustRun(t *testing.T, args ...string) {
 	t.Helper()
 	var out bytes.Buffer
