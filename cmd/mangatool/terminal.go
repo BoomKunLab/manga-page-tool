@@ -237,7 +237,7 @@ func (m *terminalPrompt) openDirectory(path string) {
 	m.directory = path
 	m.status = ""
 	m.input.SetValue("")
-	m.options = []promptOption{{label: ".  現在のフォルダ", value: path, navigationOnly: true}}
+	m.options = nil
 	if parent := filepath.Dir(path); parent != path {
 		m.options = append(m.options, promptOption{label: "..  親フォルダ（Tab で移動）", value: parent, navigationOnly: true})
 	}
